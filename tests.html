@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Golf Quote Engine | Browser tests</title>
+  <link rel="stylesheet" href="./css/styles.css">
+  <style>
+    main { padding-bottom: 32px; }
+    .test-results { width: 100%; border-collapse: collapse; margin-top: 17px; }
+    .test-results th, .test-results td { padding: 8px; border-bottom: 1px solid var(--grey-200); text-align: left; font-size: 11px; }
+    .test-results th { color: var(--grey-700); font-weight: 600; }
+    .test-result { font-weight: 700; }
+    .test-failed { color: var(--error); }
+    #test-summary { margin-top: 14px; font-weight: 600; }
+  </style>
+  <script type="module">
+    import { loadData } from "./js/data.js";
+    import { runTests } from "./tests/pricing.test.js";
+
+    const button = document.querySelector("#run-tests");
+    const summary = document.querySelector("#test-summary");
+    const body = document.querySelector("#test-results-body");
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      summary.textContent = "Loading data and running browser tests…";
+      body.replaceChildren();
+      try {
+        const result = await runTests(await loadData("./data/"));
+        for (const test of result.results) {
+          const row = document.createElement("tr");
+          const status = document.createElement("td");
+          status.className = `test-result${test.passed ? "" : " test-failed"}`;
+          status.textContent = test.passed ? "Pass" : "Fail";
+          const name = document.createElement("td");
+          name.textContent = test.name;
+          row.append(status, name);
+          if (test.error) {
+            const detail = document.createElement("td");
+            detail.className = "test-failed";
+            detail.textContent = test.error;
+            row.append(detail);
+          }
+          body.append(row);
+        }
+        summary.textContent = `${result.passed} / ${result.total} tests passed.`;
+        summary.className = result.failed.length ? "test-failed" : "";
+      } catch (error) {
+        summary.textContent = `The test runner could not load: ${error.message}`;
+        summary.className = "test-failed";
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</head>
+<body>
+  <header class="site-header shell">
+    <a class="wordmark" href="./index.html"><strong>Golf Quote Engine</strong><span>Automated tests</span></a>
+    <nav class="main-nav" aria-label="Main navigation"><a href="./index.html">Quote builder</a><a href="./dashboard.html">Dashboard</a></nav>
+  </header>
+  <main class="shell">
+    <section class="page-intro">
+      <div><p class="eyebrow">Quality checks</p><h1>Pricing and data tests</h1><p class="page-description">Run the same date, money, pricing, offers, transfers, and data-validation tests in a browser or with <code>npm test</code>.</p></div>
+    </section>
+    <button id="run-tests" class="button" type="button">Run all tests</button>
+    <p id="test-summary" role="status" aria-live="polite">Tests have not run yet.</p>
+    <table class="test-results">
+      <thead><tr><th scope="col">Result</th><th scope="col">Test case</th><th scope="col">Details</th></tr></thead>
+      <tbody id="test-results-body"></tbody>
+    </table>
+  </main>
+</body>
+</html>

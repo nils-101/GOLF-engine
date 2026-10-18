@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Saved golf holiday quotes and booking analytics.">
+  <title>Golf Quote Engine | Dashboard</title>
+  <link rel="stylesheet" href="./css/styles.css">
+  <script type="module" src="./js/dashboard.js"></script>
+</head>
+<body>
+  <header class="site-header shell">
+    <a class="wordmark" href="./index.html" aria-label="Golf Quote Engine home">
+      <strong>Golf Quote Engine</strong>
+      <span>Holiday quotations</span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="./index.html">Quote builder</a>
+      <a href="./dashboard.html" aria-current="page">Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="page-intro">
+      <div>
+        <p class="eyebrow">Sales overview</p>
+        <h1>Quote dashboard</h1>
+        <p class="page-description">Find saved bookings, update their status, and review conversion and confirmed revenue. Quote records are stored only in this browser.</p>
+      </div>
+      <span id="quote-count-label" class="status">0 saved quotes</span>
+    </section>
+
+    <div id="dashboard-notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <!-- Saved-quote totals and conversion analytics. -->
+    <section class="analytics-grid" aria-label="Quote analytics">
+      <div class="stat-card"><span>Saved quotes</span><strong id="stat-quotes">0</strong></div>
+      <div class="stat-card"><span>Confirmed conversion</span><strong id="stat-conversion">—</strong></div>
+      <div class="stat-card"><span>Confirmed revenue</span><strong id="stat-revenue">£0.00</strong></div>
+      <div class="stat-card"><span>Confirmed profit</span><strong id="stat-profit">£0.00</strong></div>
+      <div class="stat-card"><span>Average margin</span><strong id="stat-average-margin">0.0%</strong></div>
+    </section>
+
+    <!-- Monochrome inline SVG revenue and margin charts. -->
+    <div id="analytics-charts" class="charts-grid" aria-label="Revenue and margin charts"></div>
+
+    <!-- Search, status filters, and portable quote backups. -->
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Saved quotes</h2><p>Search, reopen, duplicate, remove, or change a quote status.</p></div>
+        <div class="dashboard-tools">
+          <div class="field">
+            <label for="quote-search">Search quotes</label>
+            <input id="quote-search" type="search" placeholder="Client, hotel, traveller">
+          </div>
+          <div class="field">
+            <label for="status-filter">Status</label>
+            <select id="status-filter">
+              <option value="">All statuses</option>
+              <option>Draft</option>
+              <option>Sent</option>
+              <option>Confirmed</option>
+              <option>Lost</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="button-row start">
+          <button id="export-csv" class="button button-secondary" type="button">Export CSV</button>
+          <button id="export-json" class="button button-secondary" type="button">Download JSON backup</button>
+          <button id="import-json-button" class="button button-secondary" type="button">Import JSON backup</button>
+          <input id="import-json" class="file-control" type="file" accept="application/json,.json" aria-label="Choose JSON quote backup">
+        </div>
+        <div id="quote-empty" class="empty-state" hidden>No saved quotes match this search. Save a quote from the builder to see it here.</div>
+        <div class="quote-table-wrap">
+          <table id="quote-table" class="quote-table" hidden>
+            <thead>
+              <tr>
+                <th scope="col">Client and travel</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="numeric">Sell</th>
+                <th scope="col" class="numeric hide-mobile">Profit</th>
+                <th scope="col" class="numeric hide-mobile">Margin</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="quote-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer shell">
+    <span>Analytics are calculated from quotes saved in this browser.</span>
+    <span>Back up quote data regularly using the JSON export.</span>
+  </footer>
+</body>
+</html>
