@@ -1,0 +1,6 @@
+item,unit,cost,sell,currency
+Golf buggy,per_buggy_round,35,45,EUR
+Club hire,per_player_round,30,40,EUR
+Golf bag transport,per_person,10,15,EUR
+Resort fee,per_room_night,5,8,EUR
+Booking administration,per_booking,15,20,EUR

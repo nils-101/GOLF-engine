@@ -1,0 +1,4 @@
+offer_id,name,type,hotel_or_course,valid_from,valid_to,value_1,value_2,applies_to
+STAY7PAY6,Stay 7 nights,stay_pay,Aurora Belek Resort,2027-01-01,2027-12-31,7,6,both
+EARLY10,Early booking,early_booking,ALL,2027-06-01,2027-12-31,10,90,sell
+GOLF7PLUS,One complimentary golf place,free_place,Seaside Links,2027-01-01,2027-12-31,7,0,sell

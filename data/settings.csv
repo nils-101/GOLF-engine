@@ -1,0 +1,16 @@
+key,value
+company_name,Your Company Name Ltd
+company_address,Your Company Address
+company_email,hello@example.com
+company_phone,+44 0000 000000
+bank_name,Your Bank
+account_name,Your Company Name Ltd
+sort_code,00-00-00
+account_number,00000000
+iban,GB00 XXXX 0000 0000 0000 00
+swift,XXXXGB00
+deposit_percent,30
+balance_due_weeks_before_travel,6
+quote_valid_days,14
+invoice_prefix,PF
+terms_text,The deposit confirms your booking. The balance is due before travel as shown above. Supplier availability and prices are subject to confirmation until the deposit is received.

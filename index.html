@@ -3,962 +3,296 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6f1">
-  <title>Golf holiday quote builder</title>
-  <!-- Load the PDF generator directly so the app needs no build step. -->
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Build seasonal golf holiday quotes and pro forma invoices.">
+  <title>Golf Quote Engine | Quote builder</title>
+  <link rel="stylesheet" href="./css/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-  <style>
-    /* Theme, typography, and page layout. */
-    :root {
-      color-scheme: light;
-      --ink: #1e3029;
-      --muted: #68766f;
-      --line: #dfe6df;
-      --surface: #ffffff;
-      --canvas: #f4f6f1;
-      --green: #1f6348;
-      --green-dark: #174d38;
-      --green-soft: #e9f2eb;
-      --amber: #fff4d9;
-      --amber-ink: #77520a;
-      --red: #9d3434;
-      --red-soft: #fff0ee;
-      --shadow: 0 12px 32px rgb(28 54 40 / 6%);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-synthesis: none;
-      text-rendering: optimizeLegibility;
-    }
-
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--canvas); color: var(--ink); }
-    button, input, select { font: inherit; }
-    button { cursor: pointer; }
-    .shell { width: min(1160px, calc(100% - 36px)); margin: 0 auto; padding: 32px 0 56px; }
-    .masthead { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .brand-mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: var(--green); color: white; font-size: 21px; }
-    .brand-name { margin: 0; font-size: 15px; font-weight: 750; letter-spacing: .01em; }
-    .brand-caption { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
-    .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12px; }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #c2ccc4; }
-    .status-pill.ready .status-dot { background: #43926a; }
-    .hero { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin: 0 0 24px; }
-    .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
-    h1 { margin: 0; font-size: clamp(27px, 4vw, 38px); line-height: 1.13; letter-spacing: -.04em; }
-    .hero-copy { max-width: 560px; margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
-
-    /* Main booking form and the responsive quote columns. */
-    .layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(310px, .85fr); align-items: start; gap: 20px; }
-    .main-column, .side-column { display: grid; gap: 20px; min-width: 0; }
-    .card { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
-    .card-head { display: flex; align-items: start; justify-content: space-between; gap: 14px; padding: 20px 22px 16px; }
-    .card-head h2 { margin: 0; font-size: 16px; letter-spacing: -.015em; }
-    .card-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
-    .card-body { padding: 4px 22px 22px; }
-    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-    .field { display: grid; align-content: start; gap: 7px; min-width: 0; }
-    .field.full { grid-column: 1 / -1; }
-    label, .field-label { color: #34473d; font-size: 12px; font-weight: 700; }
-    input, select { width: 100%; min-height: 43px; padding: 10px 12px; border: 1px solid #d7e0d8; border-radius: 9px; outline: none; background: #fff; color: var(--ink); }
-    input:focus, select:focus { border-color: #55906d; box-shadow: 0 0 0 3px rgb(55 122 82 / 12%); }
-    input::placeholder { color: #a0aaa3; }
-    .field-hint { color: var(--muted); font-size: 11px; line-height: 1.4; }
-    .separator { height: 1px; margin: 20px 0; background: var(--line); }
-    .subsection-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 13px; }
-    .subsection-head h3 { margin: 0; font-size: 13px; }
-    .golf-list { display: grid; gap: 10px; }
-    .golf-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(145px, .58fr) 38px; align-items: end; gap: 10px; padding: 12px; border: 1px solid #e7ece7; border-radius: 11px; background: #fbfcfa; }
-    .golf-row .field { gap: 6px; }
-    .golf-row label { font-size: 11px; }
-    .golf-row input, .golf-row select { min-height: 39px; padding: 8px 10px; font-size: 12px; }
-    .icon-button { display: grid; place-items: center; width: 38px; height: 39px; border: 1px solid var(--line); border-radius: 9px; background: white; color: #64736a; font-size: 18px; }
-    .icon-button:hover { border-color: #d8a8a0; background: var(--red-soft); color: var(--red); }
-    .extras-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .extra-control { padding: 12px; border: 1px solid #e7ece7; border-radius: 11px; background: #fbfcfa; }
-    .extra-top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-    .extra-name { font-size: 12px; font-weight: 700; }
-    .extra-unit { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
-    .extra-price { margin-top: 7px; color: var(--muted); font-size: 10px; }
-    .extra-control input { min-height: 38px; }
-
-    /* Validation messages and call-to-action styles. */
-    .messages { margin-bottom: 18px; padding: 13px 15px; border: 1px solid #f1d998; border-radius: 10px; background: var(--amber); color: var(--amber-ink); font-size: 12px; line-height: 1.5; }
-    .messages.error { border-color: #edc5c1; background: var(--red-soft); color: var(--red); }
-    .messages strong { display: block; margin-bottom: 4px; }
-    .messages ul { margin: 0; padding-left: 18px; }
-    .messages[hidden] { display: none; }
-    .button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 8px; padding: 9px 13px; border: 1px solid transparent; border-radius: 9px; font-size: 12px; font-weight: 750; transition: background .15s, border-color .15s; }
-    .button-primary { background: var(--green); color: white; }
-    .button-primary:hover:not(:disabled) { background: var(--green-dark); }
-    .button-secondary { border-color: var(--line); background: white; color: var(--green); }
-    .button-secondary:hover { border-color: #a8c4b2; background: var(--green-soft); }
-    .button:disabled { cursor: not-allowed; opacity: .48; }
-    .form-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
-
-    /* Client quote preview and private margin summary. */
-    .quote-card .card-head { padding-bottom: 18px; }
-    .quote-client { color: var(--muted); font-size: 11px; }
-    .quote-lines { padding: 0 22px; }
-    .quote-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; padding: 12px 0; border-top: 1px solid #edf0ed; }
-    .quote-line-name { font-size: 12px; font-weight: 650; line-height: 1.4; }
-    .quote-line-detail { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
-    .quote-line-price { white-space: nowrap; font-size: 12px; font-weight: 750; }
-    .quote-empty { padding: 18px 0 20px; border-top: 1px solid #edf0ed; color: var(--muted); font-size: 12px; line-height: 1.5; }
-    .quote-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 22px; border-top: 1px solid var(--line); background: #fafbf9; }
-    .quote-total-label { font-size: 12px; font-weight: 750; }
-    .quote-total-value { color: var(--green-dark); font-size: 21px; font-weight: 800; letter-spacing: -.03em; }
-    .quote-note { margin: 0; padding: 0 22px 17px; background: #fafbf9; color: var(--muted); font-size: 10px; }
-    .internal-card { border-color: #cbded0; background: #f5faf6; }
-    .internal-card .card-head { padding-bottom: 12px; }
-    .internal-badge { padding: 5px 8px; border-radius: 999px; background: #e0eee3; color: var(--green-dark); font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
-    .metric-list { padding: 0 20px 18px; }
-    .metric { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #e1ebe3; font-size: 11px; }
-    .metric span { color: var(--muted); }
-    .metric strong { font-size: 11px; }
-    .metric.profit { margin-top: 4px; padding-top: 13px; font-size: 13px; }
-    .metric.profit strong { color: var(--green-dark); font-size: 14px; }
-    .margin-track { height: 5px; overflow: hidden; margin-top: 8px; border-radius: 999px; background: #dfe9e1; }
-    .margin-fill { width: 0; height: 100%; border-radius: inherit; background: #4a9167; transition: width .2s; }
-    .pdf-hint { margin: 10px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
-    .page-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; color: var(--muted); font-size: 10px; }
-
-    /* Stack the quote below the form on narrow screens. */
-    @media (max-width: 860px) {
-      .layout { grid-template-columns: minmax(0, 1fr); }
-      .side-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .quote-card { grid-row: span 2; }
-    }
-    @media (max-width: 600px) {
-      .shell { width: min(100% - 24px, 520px); padding-top: 20px; }
-      .masthead { margin-bottom: 23px; }
-      .status-pill { font-size: 0; gap: 0; width: 30px; height: 30px; justify-content: center; padding: 0; }
-      .hero { margin-bottom: 19px; }
-      .hero-copy { font-size: 13px; }
-      .side-column { grid-template-columns: minmax(0, 1fr); }
-      .quote-card { grid-row: auto; }
-      .card-head { padding: 17px 16px 13px; }
-      .card-body { padding: 4px 16px 17px; }
-      .quote-lines { padding: 0 16px; }
-      .quote-total { padding: 14px 16px; }
-      .quote-note { padding: 0 16px 15px; }
-      .metric-list { padding: 0 16px 15px; }
-      .form-grid { gap: 13px 10px; }
-      .golf-row { grid-template-columns: minmax(0, 1fr) 38px; gap: 8px; }
-      .golf-row .field:first-child { grid-column: 1; }
-      .golf-row .field:nth-child(2) { grid-column: 1; }
-      .golf-row .icon-button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-      .extras-grid { grid-template-columns: minmax(0, 1fr); }
-      .page-foot { flex-direction: column; }
-    }
-    @media (max-width: 380px) {
-      .form-grid { grid-template-columns: minmax(0, 1fr); }
-      .field.full { grid-column: auto; }
-      .hero { align-items: start; }
-    }
-  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
+  <script type="module" src="./js/ui.js"></script>
 </head>
 <body>
-  <main class="shell">
-    <!-- Brand header and pricing-data status. -->
-    <header class="masthead">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">⛳</div>
-        <div>
-          <p class="brand-name">Fairway &amp; Stay</p>
-          <p class="brand-caption">Golf holiday quoting</p>
-        </div>
-      </div>
-      <div id="data-status" class="status-pill" role="status" aria-live="polite">
-        <span class="status-dot" aria-hidden="true"></span><span id="data-status-text">Loading rates</span>
-      </div>
-    </header>
+  <header class="site-header shell">
+    <a class="wordmark" href="./index.html" aria-label="Golf Quote Engine home">
+      <strong>Golf Quote Engine</strong>
+      <span>Holiday quotations</span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="./index.html" aria-current="page">Quote builder</a>
+      <a href="./dashboard.html">Dashboard</a>
+    </nav>
+  </header>
 
-    <section class="hero" aria-labelledby="page-title">
+  <main class="shell">
+    <section class="page-intro">
       <div>
-        <p class="eyebrow">Reservations workspace</p>
-        <h1 id="page-title">Build a golf holiday quote</h1>
-        <p class="hero-copy">Create a clear, itemised offer in minutes. Room and course rates update automatically with the season, with every client price shown in GBP.</p>
+        <p class="eyebrow">Reservations</p>
+        <h1 id="page-heading">Build a golf holiday quote</h1>
+        <p class="page-description">Create a seasonal, itemised offer for a golf trip. Supplier prices are converted to GBP for a clear client quote, with costs and margins kept private.</p>
       </div>
+      <span id="data-status" class="status" role="status" aria-live="polite">Loading price lists</span>
     </section>
 
-    <div id="load-error" class="messages error" role="alert" hidden></div>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section id="data-check" class="data-check" aria-label="Data check"></section>
+    <section id="quote-error-summary" class="error-summary" role="alert" hidden></section>
 
-    <div class="layout">
-      <!-- Booking inputs, round schedule, and optional extras. -->
-      <section class="main-column" aria-label="Booking details">
-        <section class="card">
-          <div class="card-head">
-            <div>
-              <h2>Booking details</h2>
-              <p>Enter the traveller and stay details to price the trip.</p>
+    <form id="quote-form" novalidate>
+      <div class="builder-grid">
+        <div class="builder-main">
+          <!-- A. Client details and quote record information. -->
+          <section class="form-section" aria-labelledby="client-heading">
+            <div class="section-title">
+              <h2 id="client-heading"><span class="section-index">A.</span> Client</h2>
+              <p>Contact and quote details</p>
             </div>
-          </div>
-          <div class="card-body">
-            <div id="messages" class="messages" role="alert" aria-live="assertive" hidden></div>
             <div class="form-grid">
-              <div class="field full">
-                <label for="client-name">Client name</label>
-                <input id="client-name" type="text" autocomplete="name" placeholder="e.g. Alex Morgan">
+              <div class="field span-all">
+                <label for="client-name">Client name <span aria-hidden="true">*</span></label>
+                <input id="client-name" name="clientName" type="text" autocomplete="name" placeholder="Client or booking name" required aria-describedby="client-name-error">
+                <span id="client-name-error" class="field-error" hidden></span>
+              </div>
+              <div class="field">
+                <label for="client-email">Email</label>
+                <input id="client-email" name="email" type="email" autocomplete="email" placeholder="client@example.com">
+              </div>
+              <div class="field">
+                <label for="client-phone">Phone</label>
+                <input id="client-phone" name="phone" type="tel" autocomplete="tel" placeholder="+44">
+              </div>
+              <div class="field">
+                <label for="lead-traveller">Lead traveller</label>
+                <input id="lead-traveller" name="leadTraveller" type="text" autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="quote-date">Quote date</label>
+                <input id="quote-date" name="quoteDate" type="date" required aria-describedby="quote-date-error">
+                <span id="quote-date-error" class="field-error" hidden></span>
+              </div>
+              <div class="field span-all">
+                <label for="internal-notes">Internal notes</label>
+                <textarea id="internal-notes" name="internalNotes" placeholder="Notes for your team. Not shown on the invoice."></textarea>
+              </div>
+            </div>
+          </section>
+
+          <!-- B. Traveller counts drive room capacity, extras, and golf pricing. -->
+          <section class="form-section" aria-labelledby="travellers-heading">
+            <div class="section-title">
+              <h2 id="travellers-heading"><span class="section-index">B.</span> Travellers</h2>
+              <p>Golfers cannot exceed travellers</p>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="travellers">Number of travellers</label>
+                <input id="travellers" name="travellers" type="number" min="1" step="1" inputmode="numeric" aria-describedby="travellers-error">
+                <span id="travellers-error" class="field-error" hidden></span>
               </div>
               <div class="field">
                 <label for="golfers">Number of golfers</label>
-                <input id="golfers" type="number" min="1" step="1" value="2" inputmode="numeric">
+                <input id="golfers" name="golfers" type="number" min="0" step="1" inputmode="numeric" aria-describedby="golfers-error">
+                <span id="golfers-error" class="field-error" hidden></span>
               </div>
-              <div class="field">
-                <label for="rooms">Number of rooms</label>
-                <input id="rooms" type="number" min="1" step="1" value="1" inputmode="numeric">
-                <span class="field-hint">At least one room per two golfers.</span>
-              </div>
+            </div>
+          </section>
+
+          <!-- C. Stay dates and repeatable room lines. -->
+          <section class="form-section" aria-labelledby="stay-heading">
+            <div class="section-title">
+              <h2 id="stay-heading"><span class="section-index">C.</span> Accommodation</h2>
+              <p id="stay-night-count">Seasonal room prices</p>
+            </div>
+            <div class="form-grid three">
               <div class="field">
                 <label for="hotel">Hotel</label>
-                <select id="hotel" disabled><option>Loading hotels…</option></select>
-              </div>
-              <div class="field">
-                <label for="room-type">Room type</label>
-                <select id="room-type" disabled><option>Load hotel choices first</option></select>
+                <select id="hotel" name="hotel" aria-describedby="hotel-error"><option value="">Choose a hotel</option></select>
+                <span id="hotel-error" class="field-error" hidden></span>
               </div>
               <div class="field">
                 <label for="check-in">Check-in</label>
-                <input id="check-in" type="date" value="2027-03-10">
+                <input id="check-in" name="checkIn" type="date" aria-describedby="check-in-error">
+                <span id="check-in-error" class="field-error" hidden></span>
               </div>
               <div class="field">
                 <label for="check-out">Check-out</label>
-                <input id="check-out" type="date" value="2027-03-14">
+                <input id="check-out" name="checkOut" type="date" aria-describedby="check-out-error">
+                <span id="check-out-error" class="field-error" hidden></span>
               </div>
             </div>
-
-            <div class="separator"></div>
-
-            <div class="subsection-head">
-              <div>
-                <h3>Golf rounds</h3>
-                <span class="field-hint">Each round is priced per golfer for the date selected.</span>
+            <hr class="section-rule">
+            <div class="section-title">
+              <h3>Room lines</h3>
+              <button id="add-room" class="button button-secondary" type="button">Add a room line</button>
+            </div>
+            <div id="room-lines" class="line-list" aria-live="polite"></div>
+            <span id="room-lines-error" class="field-error" hidden></span>
+            <template id="room-line-template">
+              <div class="entry-line room-line">
+                <div class="field">
+                  <label class="room-type-label">Room type</label>
+                  <select class="room-type"><option value="">Choose a room</option></select>
+                  <span class="field-error room-type-error" hidden></span>
+                  <span class="line-meta"><span class="board-tag room-board">—</span></span>
+                </div>
+                <div class="field">
+                  <label class="room-occupancy-label">Occupancy</label>
+                  <select class="room-occupancy">
+                    <option value="1">1 person</option>
+                    <option value="2" selected>2 people</option>
+                  </select>
+                  <span class="field-error room-occupancy-error" hidden></span>
+                </div>
+                <div class="field">
+                  <label class="room-count-label">Number of rooms</label>
+                  <input class="room-count number" type="number" min="1" step="1" value="1" inputmode="numeric">
+                  <span class="field-error room-count-error" hidden></span>
+                </div>
+                <button class="remove-line" type="button" aria-label="Remove room line">×</button>
               </div>
-              <button id="add-round" class="button button-secondary" type="button" disabled>+ Add round</button>
+            </template>
+          </section>
+
+          <!-- D. Golf rounds and a helper for full days at one course. -->
+          <section class="form-section" aria-labelledby="golf-heading">
+            <div class="section-title">
+              <h2 id="golf-heading"><span class="section-index">D.</span> Golf rounds</h2>
+              <p>Price per player and round</p>
             </div>
-            <div id="golf-list" class="golf-list" aria-live="polite"></div>
+            <div class="inline-helper">
+              <div class="field">
+                <label for="daily-course">Add one round each full day</label>
+                <select id="daily-course"><option value="">Choose a course</option></select>
+              </div>
+              <button id="rounds-each-day" class="button button-secondary" type="button">Fill full days</button>
+            </div>
+            <div class="button-row start">
+              <button id="add-round" class="button button-secondary" type="button">Add a golf round</button>
+            </div>
+            <div id="round-lines" class="line-list" aria-live="polite"></div>
+            <template id="round-template">
+              <div class="entry-line round-line">
+                <div class="field">
+                  <label class="round-course-label">Course</label>
+                  <select class="round-course"><option value="">Choose a course</option></select>
+                  <span class="field-error round-course-error" hidden></span>
+                </div>
+                <div class="field">
+                  <label class="round-date-label">Round date</label>
+                  <input class="round-date" type="date">
+                  <span class="field-error round-date-error" hidden></span>
+                </div>
+                <div class="field">
+                  <label class="round-players-label">Players</label>
+                  <input class="round-players number" type="number" min="1" step="1" inputmode="numeric">
+                  <span class="field-error round-players-error" hidden></span>
+                </div>
+                <button class="remove-line" type="button" aria-label="Remove golf round">×</button>
+              </div>
+            </template>
+          </section>
 
-            <div class="separator"></div>
+          <!-- E. Vehicle and passenger choices for each transfer. -->
+          <section class="form-section" aria-labelledby="transfer-heading">
+            <div class="section-title">
+              <h2 id="transfer-heading"><span class="section-index">E.</span> Transfers</h2>
+              <p>Best value vehicle combination selected automatically</p>
+            </div>
+            <div class="button-row start">
+              <button id="add-transfer" class="button button-secondary" type="button">Add a transfer</button>
+            </div>
+            <div id="transfer-lines" class="line-list" aria-live="polite"></div>
+            <template id="transfer-template">
+              <div class="entry-line transfer-line">
+                <div class="field">
+                  <label class="transfer-route-label">Route</label>
+                  <select class="transfer-route"><option value="">Choose a route</option></select>
+                  <span class="field-error transfer-route-error" hidden></span>
+                  <span class="hint vehicle-choice"></span>
+                </div>
+                <div class="field">
+                  <label class="transfer-passengers-label">Passengers</label>
+                  <input class="transfer-passengers number" type="number" min="1" step="1" inputmode="numeric">
+                  <span class="field-error transfer-passengers-error" hidden></span>
+                </div>
+                <label class="check-field">
+                  <input class="transfer-return" type="checkbox">
+                  Return journey
+                </label>
+                <button class="remove-line" type="button" aria-label="Remove transfer">×</button>
+              </div>
+            </template>
+          </section>
 
-            <div class="subsection-head">
-              <div>
-                <h3>Optional extras</h3>
-                <span class="field-hint">Per-person quantities multiply by golfers; per-round by booked rounds.</span>
+          <!-- F. CSV-defined extras with automatic quantities and manual overrides. -->
+          <section class="form-section" aria-labelledby="extras-heading">
+            <div class="section-title">
+              <h2 id="extras-heading"><span class="section-index">F.</span> Extras</h2>
+              <p>Blank quantity uses the automatic amount</p>
+            </div>
+            <div id="extra-lines"></div>
+            <template id="extra-template">
+              <div class="extra-line">
+                <div>
+                  <label class="extra-name"></label><span class="extra-unit"></span>
+                  <div class="extra-meta"><span class="extra-auto"></span><span class="extra-effective"></span></div>
+                </div>
+                <input class="extra-quantity number" type="number" min="0" step="1" inputmode="numeric" placeholder="Auto">
+              </div>
+            </template>
+          </section>
+
+          <div class="button-row">
+            <button id="save-quote" class="button button-secondary" type="button" disabled>Save quote</button>
+            <button id="download-invoice" class="button" type="button" disabled>Download pro forma invoice</button>
+          </div>
+        </div>
+
+        <!-- Live client quote and internal-only margin summary. -->
+        <aside class="builder-side" aria-label="Quote summary">
+          <section id="warning-panel" class="warning-panel" aria-label="Quote warnings" hidden>
+            <strong>Review these notes</strong>
+            <ul id="warning-list"></ul>
+          </section>
+          <section class="quote-summary" aria-labelledby="quote-summary-title">
+            <div class="quote-summary-head">
+              <h2 id="quote-summary-title">Quote preview</h2>
+              <p id="quote-client-label">Client quote</p>
+              <p id="quote-travel-label">Travel dates not complete</p>
+            </div>
+            <div id="quote-lines" class="quote-lines" aria-live="polite"></div>
+            <div class="quote-total-block">
+              <div class="quote-total-row"><span>Total in GBP</span><strong id="quote-total">—</strong></div>
+              <div class="payment-summary">
+                <span><b>Deposit</b><b id="quote-deposit">—</b></span>
+                <span><b>Due now</b><b id="quote-due-now">—</b></span>
+                <span><b>Balance</b><b id="quote-balance">—</b></span>
               </div>
             </div>
-            <div id="extras-list" class="extras-grid"></div>
-            <div class="form-actions">
-              <button id="download-invoice" class="button button-primary" type="button" disabled>Download pro forma invoice</button>
+          </section>
+          <section class="internal-card" aria-labelledby="internal-title">
+            <div class="internal-card-head">
+              <div><h3 id="internal-title">Pricing and margin</h3><p>Supplier amounts converted to GBP</p></div>
+              <span class="internal-label">Internal</span>
             </div>
-            <p id="pdf-hint" class="pdf-hint">Complete the booking details to prepare an invoice.</p>
-          </div>
-        </section>
-      </section>
-
-      <!-- Client-visible itemisation, totals, and staff-only margin panel. -->
-      <aside class="side-column" aria-label="Quote summary">
-        <section class="card quote-card">
-          <div class="card-head">
-            <div>
-              <h2>Quote preview</h2>
-              <p id="quote-client" class="quote-client">Your client-ready itemisation</p>
+            <div class="internal-metrics">
+              <div class="metric"><span>Total cost</span><strong id="internal-cost">—</strong></div>
+              <div class="metric"><span>Total sell</span><strong id="internal-sell">—</strong></div>
+              <div class="metric"><span>Profit</span><strong id="internal-profit">—</strong></div>
+              <div class="metric"><span>Margin</span><strong id="internal-margin">—</strong></div>
+              <div class="metric"><span>Markup</span><strong id="internal-markup">—</strong></div>
             </div>
-          </div>
-          <div id="quote-lines" class="quote-lines">
-            <p class="quote-empty">Enter a client name and valid booking details to see the itemised GBP quote.</p>
-          </div>
-          <div class="quote-total">
-            <span class="quote-total-label">Total in GBP</span>
-            <strong id="quote-total" class="quote-total-value">—</strong>
-          </div>
-          <p class="quote-note">All client prices include seasonal rates converted to GBP.</p>
-        </section>
-
-        <section class="card internal-card" aria-label="Internal pricing and margin">
-          <div class="card-head">
-            <div>
-              <h2>Pricing &amp; margin</h2>
-              <p>Internal only - not included in the client invoice.</p>
-            </div>
-            <span class="internal-badge">Internal</span>
-          </div>
-          <div class="metric-list">
-            <div class="metric"><span>Total cost</span><strong id="total-cost">—</strong></div>
-            <div class="metric"><span>Total sell</span><strong id="total-sell">—</strong></div>
-            <div class="metric profit"><span>Profit</span><strong id="profit">—</strong></div>
-            <div class="metric"><span>Margin</span><strong id="margin">—</strong></div>
-            <div class="margin-track" aria-hidden="true"><div id="margin-fill" class="margin-fill"></div></div>
-          </div>
-        </section>
-      </aside>
-    </div>
-
-    <footer class="page-foot">
-      <span>Rates and seasons are loaded from the current repository CSV files.</span>
-      <span>Pro forma invoice only - not a tax invoice.</span>
-    </footer>
+          </section>
+        </aside>
+      </div>
+    </form>
   </main>
 
-  <!-- CSV parsing, seasonal pricing, quote rendering, and invoice generation. -->
-  <script>
-    "use strict";
-
-    const csvFiles = {
-      seasons: "./seasons.csv",
-      hotels: "./hotels.csv",
-      golf: "./golf.csv",
-      extras: "./extras.csv",
-      fx: "./fx.csv"
-    };
-    const $ = (selector) => document.querySelector(selector);
-    const elements = {
-      dataStatus: $("#data-status"),
-      dataStatusText: $("#data-status-text"),
-      loadError: $("#load-error"),
-      clientName: $("#client-name"),
-      golfers: $("#golfers"),
-      rooms: $("#rooms"),
-      hotel: $("#hotel"),
-      roomType: $("#room-type"),
-      checkIn: $("#check-in"),
-      checkOut: $("#check-out"),
-      golfList: $("#golf-list"),
-      extrasList: $("#extras-list"),
-      addRound: $("#add-round"),
-      invoiceButton: $("#download-invoice"),
-      pdfHint: $("#pdf-hint"),
-      messages: $("#messages"),
-      quoteClient: $("#quote-client"),
-      quoteLines: $("#quote-lines"),
-      quoteTotal: $("#quote-total"),
-      totalCost: $("#total-cost"),
-      totalSell: $("#total-sell"),
-      profit: $("#profit"),
-      margin: $("#margin"),
-      marginFill: $("#margin-fill")
-    };
-    let pricingData = null;
-    let currentQuote = null;
-    let golfRowId = 0;
-    const formatter = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
-
-    // Parse CSV rows including quoted fields, escaped quotes, and commas in names.
-    function parseCsv(text) {
-      const rows = [];
-      let row = [];
-      let cell = "";
-      let quoted = false;
-      for (let index = 0; index < text.length; index += 1) {
-        const character = text[index];
-        if (quoted) {
-          if (character === '"' && text[index + 1] === '"') {
-            cell += '"';
-            index += 1;
-          } else if (character === '"') {
-            quoted = false;
-          } else {
-            cell += character;
-          }
-        } else if (character === '"' && cell.length === 0) {
-          quoted = true;
-        } else if (character === ",") {
-          row.push(cell);
-          cell = "";
-        } else if (character === "\n" || character === "\r") {
-          if (character === "\r" && text[index + 1] === "\n") index += 1;
-          row.push(cell);
-          if (row.some((value) => value.trim() !== "")) rows.push(row);
-          row = [];
-          cell = "";
-        } else {
-          cell += character;
-        }
-      }
-      if (quoted) throw new Error("A CSV file contains an unclosed quoted field.");
-      if (cell.length > 0 || row.length > 0) {
-        row.push(cell);
-        if (row.some((value) => value.trim() !== "")) rows.push(row);
-      }
-      if (rows.length < 2) throw new Error("A CSV file is empty or has no data rows.");
-      const headers = rows[0].map((header) => header.trim());
-      return rows.slice(1).map((values, rowIndex) => {
-        if (values.length !== headers.length) {
-          throw new Error(`CSV row ${rowIndex + 2} has ${values.length} columns; expected ${headers.length}.`);
-        }
-        return Object.fromEntries(headers.map((header, index) => [header, values[index].trim()]));
-      });
-    }
-
-    // Fetch the five repository data files and reject failed responses explicitly.
-    async function loadPricingData() {
-      const entries = await Promise.all(Object.entries(csvFiles).map(async ([key, path]) => {
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`${path} returned HTTP ${response.status}.`);
-        return [key, parseCsv(await response.text())];
-      }));
-      return Object.fromEntries(entries);
-    }
-
-    function seasonForDate(date) {
-      if (!date) return null;
-      return pricingData.seasons.find((season) => date >= season.start_date && date <= season.end_date) || null;
-    }
-
-    function exchangeRate(currency) {
-      const row = pricingData.fx.find((item) => item.currency === currency);
-      const rate = row ? Number(row.rate_to_gbp) : NaN;
-      return Number.isFinite(rate) && rate > 0 ? rate : null;
-    }
-
-    function convertToGBP(amount, currency) {
-      const rate = exchangeRate(currency);
-      return rate === null ? null : amount * rate;
-    }
-
-    function priceRow(rows, criteria) {
-      return rows.find((row) => Object.entries(criteria).every(([key, value]) => row[key] === value)) || null;
-    }
-
-    function selectedGolfRounds() {
-      return [...elements.golfList.querySelectorAll(".golf-row")].map((row) => ({
-        course: row.querySelector("select").value,
-        date: row.querySelector('input[type="date"]').value
-      }));
-    }
-
-    // Build the golf-round controls using the courses supplied by golf.csv.
-    function addGolfRow(course = "", date = "") {
-      const row = document.createElement("div");
-      row.className = "golf-row";
-      const courseField = document.createElement("div");
-      courseField.className = "field";
-      const courseLabel = document.createElement("label");
-      courseLabel.textContent = "Golf course";
-      const courseSelect = document.createElement("select");
-      courseSelect.setAttribute("aria-label", "Golf course");
-      const coursePlaceholder = document.createElement("option");
-      coursePlaceholder.value = "";
-      coursePlaceholder.textContent = "Choose a course";
-      courseSelect.append(coursePlaceholder);
-      const courses = [...new Set(pricingData.golf.map((item) => item.course))];
-      for (const courseName of courses) {
-        const option = document.createElement("option");
-        option.value = courseName;
-        option.textContent = courseName;
-        courseSelect.append(option);
-      }
-      courseSelect.value = course;
-      golfRowId += 1;
-      courseLabel.htmlFor = `course-${golfRowId}`;
-      courseSelect.id = courseLabel.htmlFor;
-      courseField.append(courseLabel, courseSelect);
-
-      const dateField = document.createElement("div");
-      dateField.className = "field";
-      const dateLabel = document.createElement("label");
-      dateLabel.textContent = "Round date";
-      const dateInput = document.createElement("input");
-      dateInput.type = "date";
-      dateInput.setAttribute("aria-label", "Golf round date");
-      dateInput.value = date;
-      dateLabel.htmlFor = `golf-date-${golfRowId}`;
-      dateInput.id = dateLabel.htmlFor;
-      dateField.append(dateLabel, dateInput);
-
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "icon-button";
-      remove.setAttribute("aria-label", "Remove golf round");
-      remove.title = "Remove round";
-      remove.textContent = "×";
-      remove.addEventListener("click", () => {
-        row.remove();
-        updateQuote();
-      });
-      courseSelect.addEventListener("change", updateQuote);
-      dateInput.addEventListener("input", updateQuote);
-      row.append(courseField, dateField, remove);
-      elements.golfList.append(row);
-      updateQuote();
-    }
-
-    // Render quantity fields for extras; each unit follows its CSV per-person or per-round basis.
-    function renderExtras() {
-      elements.extrasList.replaceChildren();
-      for (const [index, extra] of pricingData.extras.entries()) {
-        const card = document.createElement("div");
-        card.className = "extra-control";
-        const top = document.createElement("div");
-        top.className = "extra-top";
-        const name = document.createElement("span");
-        name.className = "extra-name";
-        name.textContent = extra.item;
-        const unit = document.createElement("span");
-        unit.className = "extra-unit";
-        unit.textContent = extra.unit;
-        top.append(name, unit);
-        const input = document.createElement("input");
-        input.type = "number";
-        input.min = "0";
-        input.step = "1";
-        input.value = "0";
-        input.inputMode = "numeric";
-        input.dataset.extraIndex = String(index);
-        input.setAttribute("aria-label", `${extra.item} quantity`);
-        input.addEventListener("input", updateQuote);
-        const price = document.createElement("div");
-        price.className = "extra-price";
-        const unitSell = Number(extra.sell);
-        const unitCurrency = extra.currency;
-        const gbp = Number.isFinite(unitSell) ? convertToGBP(unitSell, unitCurrency) : null;
-        price.textContent = gbp === null ? `Rate unavailable (${unitCurrency})` : `${formatter.format(gbp)} per ${extra.unit.replace(/^per /, "")}`;
-        card.append(top, input, price);
-        elements.extrasList.append(card);
-      }
-    }
-
-    function readWholeNumber(element, label, errors, minimum = 1) {
-      const value = Number(element.value);
-      if (!Number.isInteger(value) || value < minimum) {
-        errors.push(`${label} must be a whole number of at least ${minimum}.`);
-        return null;
-      }
-      return value;
-    }
-
-    function addPriceLine(lines, errors, description, quantity, row, costField, sellField) {
-      const cost = Number(row[costField]);
-      const sell = Number(row[sellField]);
-      if (!Number.isFinite(cost) || cost < 0 || !Number.isFinite(sell) || sell < 0) {
-        errors.push(`A cost or sell price is missing for ${description}.`);
-        return;
-      }
-      const costGBP = convertToGBP(cost, row.currency);
-      const sellGBP = convertToGBP(sell, row.currency);
-      if (costGBP === null || sellGBP === null) {
-        errors.push(`No valid GBP exchange rate is available for ${row.currency} (${description}).`);
-        return;
-      }
-      lines.push({
-        description,
-        quantity,
-        unitSellGBP: sellGBP,
-        costGBP: costGBP * quantity,
-        sellGBP: sellGBP * quantity
-      });
-    }
-
-    // Validate the stay and calculate season-specific hotel, golf, and extra line items.
-    function calculateQuote() {
-      const errors = [];
-      const golfers = readWholeNumber(elements.golfers, "Number of golfers", errors);
-      const rooms = readWholeNumber(elements.rooms, "Number of rooms", errors);
-      if (golfers !== null && rooms !== null && rooms < Math.ceil(golfers / 2)) {
-        errors.push(`At least ${Math.ceil(golfers / 2)} room${Math.ceil(golfers / 2) === 1 ? "" : "s"} required for ${golfers} golfer${golfers === 1 ? "" : "s"} (one room per two golfers).`);
-      }
-      const checkIn = elements.checkIn.value;
-      const checkOut = elements.checkOut.value;
-      if (!checkIn || !checkOut) {
-        errors.push("Enter both check-in and check-out dates.");
-      } else if (checkOut <= checkIn) {
-        errors.push("Check-out must be after check-in.");
-      }
-      const hotel = elements.hotel.value;
-      const roomType = elements.roomType.value;
-      if (!hotel || !roomType) errors.push("Choose a hotel and room type.");
-      const rounds = selectedGolfRounds();
-      for (const [index, round] of rounds.entries()) {
-        if (!round.course) errors.push(`Choose a course for golf round ${index + 1}.`);
-        if (!round.date) errors.push(`Choose a date for golf round ${index + 1}.`);
-        if (round.date && checkIn && checkOut && (round.date < checkIn || round.date >= checkOut)) {
-          errors.push(`Golf round ${index + 1} must fall on or after check-in and before check-out.`);
-        }
-        if (round.date && !seasonForDate(round.date)) {
-          errors.push(`No season is defined for golf round ${index + 1} on ${round.date}.`);
-        }
-      }
-      for (const row of pricingData.hotels) {
-        if (row.hotel === hotel && row.room_type === roomType && !exchangeRate(row.currency)) {
-          errors.push(`No valid GBP exchange rate is available for ${row.currency} (${hotel} ${roomType}).`);
-          break;
-        }
-      }
-      if (errors.length) return { errors, lines: [], totalCost: 0, totalSell: 0 };
-
-      const lines = [];
-      const nightCounts = new Map();
-      const cursor = new Date(`${checkIn}T00:00:00Z`);
-      const end = new Date(`${checkOut}T00:00:00Z`);
-      while (cursor < end) {
-        const nightDate = cursor.toISOString().slice(0, 10);
-        const season = seasonForDate(nightDate);
-        if (!season) {
-          errors.push(`No season is defined for hotel night on ${nightDate}.`);
-        } else {
-          const entry = nightCounts.get(season.season) || { nights: 0, season };
-          entry.nights += 1;
-          nightCounts.set(season.season, entry);
-        }
-        cursor.setUTCDate(cursor.getUTCDate() + 1);
-      }
-      for (const { season, nights } of nightCounts.values()) {
-        const rate = priceRow(pricingData.hotels, { hotel, room_type: roomType, season: season.season });
-        const description = `${hotel} - ${roomType} - ${season.season} season (${nights} night${nights === 1 ? "" : "s"} × ${rooms} room${rooms === 1 ? "" : "s"})`;
-        if (!rate) {
-          errors.push(`No hotel rate is listed for ${hotel}, ${roomType}, ${season.season}.`);
-          continue;
-        }
-        addPriceLine(lines, errors, description, nights * rooms, rate, "cost_per_night", "sell_per_night");
-      }
-
-      for (const [index, round] of rounds.entries()) {
-        if (!round.course || !round.date) continue;
-        const season = seasonForDate(round.date);
-        const rate = season ? priceRow(pricingData.golf, { course: round.course, season: season.season }) : null;
-        if (!rate) {
-          errors.push(`No golf rate is listed for ${round.course} in ${season ? season.season : "the selected season"}.`);
-          continue;
-        }
-        addPriceLine(
-          lines,
-          errors,
-          `${round.course} - ${round.date} (${golfers} golfer${golfers === 1 ? "" : "s"}, round ${index + 1})`,
-          golfers,
-          rate,
-          "cost_per_round",
-          "sell_per_round"
-        );
-      }
-
-      for (const input of elements.extrasList.querySelectorAll("input")) {
-        const extra = pricingData.extras[Number(input.dataset.extraIndex)];
-        const quantity = Number(input.value);
-        if (!Number.isInteger(quantity) || quantity < 0) {
-          errors.push(`${extra.item} quantity must be a whole number of zero or more.`);
-          continue;
-        }
-        const basis = extra.unit === "per person" ? golfers : extra.unit === "per round" ? rounds.length : 1;
-        const chargeQuantity = quantity * basis;
-        if (chargeQuantity === 0) continue;
-        addPriceLine(
-          lines,
-          errors,
-          `${extra.item} (${quantity} × ${extra.unit}${basis > 1 ? ` × ${basis}` : ""})`,
-          chargeQuantity,
-          extra,
-          "cost",
-          "sell"
-        );
-      }
-
-      return {
-        errors,
-        lines,
-        totalCost: lines.reduce((total, line) => total + line.costGBP, 0),
-        totalSell: lines.reduce((total, line) => total + line.sellGBP, 0)
-      };
-    }
-
-    function makeCell(row, text, className = "") {
-      const cell = document.createElement("div");
-      if (className) cell.className = className;
-      cell.textContent = text;
-      row.append(cell);
-      return cell;
-    }
-
-    // Update the client quote and the separate internal margin panel after every edit.
-    function updateQuote() {
-      if (!pricingData) return;
-      const result = calculateQuote();
-      const clientMissing = !elements.clientName.value.trim();
-      const errors = clientMissing
-        ? ["Enter the client name before downloading a pro forma invoice.", ...result.errors]
-        : result.errors;
-      const valid = result.errors.length === 0;
-      currentQuote = valid ? result : null;
-      const message = $("#messages");
-      if (errors.length) {
-        message.hidden = false;
-        message.className = `messages${errors.some((error) => error.includes("No ")) ? " error" : ""}`;
-        const heading = document.createElement("strong");
-        heading.textContent = "Please review the booking";
-        const list = document.createElement("ul");
-        for (const error of errors) {
-          const item = document.createElement("li");
-          item.textContent = error;
-          list.append(item);
-        }
-        message.replaceChildren(heading, list);
-      } else {
-        message.hidden = true;
-        message.replaceChildren();
-      }
-
-      elements.quoteLines.replaceChildren();
-      elements.quoteClient.textContent = elements.clientName.value.trim() || "Your client-ready itemisation";
-      if (!valid) {
-        const empty = document.createElement("p");
-        empty.className = "quote-empty";
-        empty.textContent = "Fix the booking details above to calculate an accurate GBP quote.";
-        elements.quoteLines.append(empty);
-        elements.quoteTotal.textContent = "—";
-        elements.totalCost.textContent = "—";
-        elements.totalSell.textContent = "—";
-        elements.profit.textContent = "—";
-        elements.margin.textContent = "—";
-        elements.marginFill.style.width = "0";
-      } else if (result.lines.length === 0) {
-        const empty = document.createElement("p");
-        empty.className = "quote-empty";
-        empty.textContent = "No priced items were selected.";
-        elements.quoteLines.append(empty);
-      } else {
-        for (const line of result.lines) {
-          const item = document.createElement("div");
-          item.className = "quote-line";
-          const description = document.createElement("div");
-          makeCell(description, line.description, "quote-line-name");
-          makeCell(description, `${line.quantity} unit${line.quantity === 1 ? "" : "s"} × ${formatter.format(line.unitSellGBP)} per unit`, "quote-line-detail");
-          item.append(description);
-          makeCell(item, formatter.format(line.sellGBP), "quote-line-price");
-          elements.quoteLines.append(item);
-        }
-        elements.quoteTotal.textContent = formatter.format(result.totalSell);
-        elements.totalCost.textContent = formatter.format(result.totalCost);
-        elements.totalSell.textContent = formatter.format(result.totalSell);
-        const profit = result.totalSell - result.totalCost;
-        const margin = result.totalSell > 0 ? (profit / result.totalSell) * 100 : 0;
-        elements.profit.textContent = formatter.format(profit);
-        elements.margin.textContent = `${margin.toFixed(1)}%`;
-        elements.marginFill.style.width = `${Math.max(0, Math.min(100, margin))}%`;
-      }
-      const pdfReady = Boolean(window.jspdf && window.jspdf.jsPDF);
-      elements.invoiceButton.disabled = !valid || clientMissing || !pdfReady;
-      elements.pdfHint.textContent = !pdfReady
-        ? "The PDF library could not be loaded. Check your internet connection and reload."
-        : valid
-          ? clientMissing
-            ? "Enter the client name to prepare a pro forma invoice."
-            : "A pro forma PDF will be created for the client; internal costs are excluded."
-          : "Complete the booking details to prepare an invoice.";
-    }
-
-    function formatDate(date) {
-      return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
-        .format(new Date(`${date}T00:00:00Z`));
-    }
-
-    function datePlusDays(date, days) {
-      const result = new Date(`${date}T00:00:00Z`);
-      result.setUTCDate(result.getUTCDate() + days);
-      return result.toISOString().slice(0, 10);
-    }
-
-    function localToday() {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, "0");
-      const day = String(today.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }
-
-    // Draw an itemised, paginated pro forma invoice using jsPDF without an extra plugin.
-    function downloadInvoice() {
-      if (!currentQuote || !window.jspdf || !window.jspdf.jsPDF) return;
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const client = elements.clientName.value.trim();
-      const issueDate = localToday();
-      const validUntil = datePlusDays(issueDate, 14);
-      const invoiceNumber = `PF-${issueDate.replaceAll("-", "")}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-      const margin = 15;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const tableWidth = pageWidth - margin * 2;
-      const columns = { description: tableWidth - 91, quantity: 19, unit: 34, total: 38 };
-
-      function drawTableHeader(y) {
-        doc.setFillColor(31, 99, 72);
-        doc.rect(margin, y, tableWidth, 9, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.text("DESCRIPTION", margin + 3, y + 6);
-        doc.text("QTY", margin + columns.description + 2, y + 6);
-        doc.text("UNIT PRICE", margin + columns.description + columns.quantity + 2, y + 6);
-        doc.text("AMOUNT", margin + tableWidth - 2, y + 6, { align: "right" });
-        doc.setTextColor(35, 48, 41);
-        doc.setFont("helvetica", "normal");
-        return y + 9;
-      }
-
-      function nextPage() {
-        doc.addPage();
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.text("PRO FORMA INVOICE - continued", margin, 16);
-        return drawTableHeader(21);
-      }
-
-      doc.setTextColor(31, 99, 72);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("YOUR GOLF HOLIDAY COMPANY", margin, 18);
-      doc.setTextColor(30, 48, 41);
-      doc.setFontSize(22);
-      doc.text("PRO FORMA INVOICE", margin, 31);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(104, 118, 111);
-      doc.text("This is a quotation for payment and is not a tax invoice.", margin, 37);
-
-      const metaX = pageWidth - margin - 61;
-      doc.setTextColor(30, 48, 41);
-      doc.setFont("helvetica", "bold");
-      doc.text("Invoice number", metaX, 17);
-      doc.text("Issue date", metaX, 26);
-      doc.text("Valid until", metaX, 35);
-      doc.setFont("helvetica", "normal");
-      doc.text(invoiceNumber, pageWidth - margin, 17, { align: "right" });
-      doc.text(formatDate(issueDate), pageWidth - margin, 26, { align: "right" });
-      doc.text(formatDate(validUntil), pageWidth - margin, 35, { align: "right" });
-
-      doc.setDrawColor(223, 230, 223);
-      doc.line(margin, 45, pageWidth - margin, 45);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(104, 118, 111);
-      doc.text("PREPARED FOR", margin, 54);
-      doc.setTextColor(30, 48, 41);
-      doc.setFontSize(12);
-      doc.text(client, margin, 61);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(104, 118, 111);
-      doc.text(`Travel dates: ${formatDate(elements.checkIn.value)} - ${formatDate(elements.checkOut.value)}`, margin, 68);
-
-      let y = drawTableHeader(77);
-      for (const line of currentQuote.lines) {
-        const wrapped = doc.splitTextToSize(line.description, columns.description - 5);
-        const rowHeight = Math.max(10, wrapped.length * 4.5 + 4);
-        if (y + rowHeight + 45 > pageHeight) y = nextPage();
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(35, 48, 41);
-        doc.text(wrapped, margin + 3, y + 5);
-        doc.text(String(line.quantity), margin + columns.description + 2, y + 5);
-        doc.text(formatter.format(line.unitSellGBP), margin + columns.description + columns.quantity + 2, y + 5);
-        doc.text(formatter.format(line.sellGBP), margin + tableWidth - 2, y + 5, { align: "right" });
-        doc.setDrawColor(231, 236, 231);
-        doc.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
-        y += rowHeight;
-      }
-      if (y + 42 > pageHeight) y = nextPage();
-
-      const total = currentQuote.totalSell;
-      const deposit = total * 0.3;
-      const balance = total - deposit;
-      y += 8;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(30, 48, 41);
-      doc.text("TOTAL (GBP)", margin + tableWidth - 91, y);
-      doc.setTextColor(31, 99, 72);
-      doc.setFontSize(16);
-      doc.text(formatter.format(total), pageWidth - margin, y, { align: "right" });
-      y += 10;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(65, 79, 70);
-      doc.text(`30% deposit: ${formatter.format(deposit)}`, margin + tableWidth - 91, y);
-      doc.text(`Balance (70%): ${formatter.format(balance)}`, margin + tableWidth - 91, y + 6);
-
-      y += 20;
-      if (y + 20 > pageHeight) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.setDrawColor(223, 230, 223);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 8;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(30, 48, 41);
-      doc.text("PAYMENT TERMS", margin, y);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(65, 79, 70);
-      doc.text("A 30% deposit is required to confirm the booking. The remaining balance is due 6 weeks before travel.", margin, y + 6);
-      doc.text(`Balance due by: ${formatDate(datePlusDays(elements.checkIn.value, -42))}`, margin, y + 12);
-      doc.save(`${invoiceNumber}.pdf`);
-    }
-
-    // Populate CSV-driven choices, wire form changes, and report fetch or PDF-library failures.
-    function setupForm() {
-      const hotels = [...new Set(pricingData.hotels.map((row) => row.hotel))];
-      elements.hotel.replaceChildren();
-      for (const hotel of hotels) {
-        const option = document.createElement("option");
-        option.value = hotel;
-        option.textContent = hotel;
-        elements.hotel.append(option);
-      }
-      elements.hotel.disabled = false;
-      function updateRoomTypes() {
-        const previous = elements.roomType.value;
-        const roomTypes = [...new Set(pricingData.hotels
-          .filter((row) => row.hotel === elements.hotel.value)
-          .map((row) => row.room_type))];
-        elements.roomType.replaceChildren();
-        for (const roomType of roomTypes) {
-          const option = document.createElement("option");
-          option.value = roomType;
-          option.textContent = roomType;
-          elements.roomType.append(option);
-        }
-        if (roomTypes.includes(previous)) elements.roomType.value = previous;
-        elements.roomType.disabled = roomTypes.length === 0;
-      }
-      elements.hotel.addEventListener("change", () => {
-        updateRoomTypes();
-        updateQuote();
-      });
-      elements.roomType.addEventListener("change", updateQuote);
-      updateRoomTypes();
-      renderExtras();
-      elements.addRound.disabled = false;
-      elements.addRound.addEventListener("click", () => addGolfRow("", elements.checkIn.value));
-      elements.invoiceButton.addEventListener("click", downloadInvoice);
-      for (const control of [elements.clientName, elements.golfers, elements.rooms, elements.checkIn, elements.checkOut]) {
-        control.addEventListener("input", updateQuote);
-      }
-      for (const control of [elements.hotel, elements.roomType]) {
-        control.addEventListener("change", updateQuote);
-      }
-      addGolfRow(pricingData.golf[0]?.course || "", "2027-03-12");
-    }
-
-    window.addEventListener("load", () => {
-      if (!window.jspdf || !window.jspdf.jsPDF) {
-        elements.pdfHint.textContent = "The PDF library could not be loaded. Check your internet connection and reload.";
-      }
-      updateQuote();
-    });
-
-    loadPricingData()
-      .then((data) => {
-        pricingData = data;
-        setupForm();
-        elements.dataStatus.classList.add("ready");
-        elements.dataStatusText.textContent = "Rates loaded";
-      })
-      .catch((error) => {
-        elements.dataStatusText.textContent = "Pricing data unavailable";
-        elements.loadError.hidden = false;
-        elements.loadError.textContent = `Could not load the pricing CSV files. Make sure the app is served from the repository or GitHub Pages and reload. Details: ${error.message}`;
-        elements.pdfHint.textContent = "Load the pricing files before preparing an invoice.";
-      });
-  </script>
+  <div class="total-mobile" aria-live="polite">
+    <span>Client total (GBP)</span><strong id="mobile-total">—</strong>
+  </div>
+  <footer class="site-footer shell">
+    <span>Prices follow the season for each night and round. All client prices are shown in GBP.</span>
+    <span>Pro forma invoice only; not a VAT invoice.</span>
+  </footer>
 </body>
 </html>
