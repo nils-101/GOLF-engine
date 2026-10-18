@@ -1,6 +1,8 @@
-import { formatDate, todayISO } from "./dates.js";
 import { formatGBP } from "./money.js";
 import { nextInvoiceNumber } from "./storage.js";
+
+const PAGE_MARGIN = 16;
+const PAGE_FOOTER = 9;
 
 function plain(value) {
   return String(value ?? "").trim();
@@ -12,167 +14,268 @@ function safeFilename(value) {
   return safe || "Client";
 }
 
-function textOrPlaceholder(settings, key) {
-  return plain(settings[key]) || "Not provided";
+function dateDDMMYYYY(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(plain(value));
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
 }
 
-export function generateInvoicePdf({ quote, data, settings, jsPDF = globalThis.jspdf?.jsPDF }) {
-  if (!quote?.result || quote.result.errors?.length) return { invoiceNumber: null, error: "Save a valid quote before creating an invoice." };
-  if (typeof jsPDF !== "function") return { invoiceNumber: null, error: "The PDF libraries are unavailable. Check your connection and reload." };
-  const issueDate = quote.inputs.quoteDate || todayISO();
+function datesInText(value) {
+  return String(value ?? "").replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, "$3/$2/$1");
+}
+
+async function fetchDataUrl(path) {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error(`Could not load ${path} (HTTP ${response.status}).`);
+  const blob = await response.blob();
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return `data:${blob.type || "image/png"};base64,${btoa(binary)}`;
+}
+
+function addSignatureFont(doc, fontBase64) {
+  doc.addFileToVFS("GreatVibes-Regular.ttf", fontBase64);
+  doc.addFont("GreatVibes-Regular.ttf", "GreatVibes", "normal");
+  doc.setFont("GreatVibes", "normal");
+  doc.getTextWidth("Signature test");
+}
+
+async function loadSignatureFont() {
+  const response = await fetch("./fonts/GreatVibes-Regular.ttf");
+  if (!response.ok) throw new Error(`Could not load signature font (HTTP ${response.status}).`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function settingsLines(settings, keys) {
+  return keys.map((key) => plain(settings[key])).filter(Boolean);
+}
+
+function paymentLines(settings, totals, quote) {
+  const depositDue = dateDDMMYYYY(quote.inputs.quoteDate);
+  const balanceDue = dateDDMMYYYY(totals.dueImmediately ? quote.inputs.quoteDate : totals.balanceDueDate);
+  const bank = Object.fromEntries([
+    "bank_name",
+    "account_name",
+    "sort_code",
+    "account_number",
+    "iban",
+    "swift"
+  ].map((key) => [key, plain(settings[key])]));
+  return [
+    `Deposit: ${formatGBP(totals.depositGBP)} due ${depositDue} | Balance: ${formatGBP(totals.balanceGBP)} due ${balanceDue}`,
+    [bank.bank_name && `Bank: ${bank.bank_name}`, bank.account_name && `Account name: ${bank.account_name}`].filter(Boolean).join(" | "),
+    [bank.sort_code && `Sort code: ${bank.sort_code}`, bank.account_number && `Account number: ${bank.account_number}`].filter(Boolean).join(" | "),
+    [bank.iban && `IBAN: ${bank.iban}`, bank.swift && `SWIFT: ${bank.swift}`].filter(Boolean).join(" | ")
+  ];
+}
+
+export async function generateInvoicePdf({ quote, settings, jsPDF = globalThis.jspdf?.jsPDF }) {
+  if (!quote?.result || quote.result.errors?.length) {
+    return { invoiceNumber: null, error: "Fix the quote errors before creating an invoice." };
+  }
+  if (typeof jsPDF !== "function") {
+    return { invoiceNumber: null, error: "The PDF libraries are unavailable. Check your connection and reload." };
+  }
+
+  const issueDate = plain(quote.inputs.quoteDate);
   const invoiceYear = issueDate.slice(0, 4);
-  const { invoiceNumber, error } = nextInvoiceNumber(settings.invoice_prefix || "PF", invoiceYear);
-  if (error) return { invoiceNumber: null, error };
+  const prefix = settings.invoice_prefix || "PF";
+  const existingInvoiceNumber = quote.invoiceNumber?.startsWith(`${prefix}-${invoiceYear}-`)
+    ? quote.invoiceNumber
+    : null;
+  const reservation = existingInvoiceNumber
+    ? { invoiceNumber: existingInvoiceNumber, error: null }
+    : nextInvoiceNumber(prefix, invoiceYear);
+  const { invoiceNumber } = reservation;
+  if (!invoiceNumber) {
+    return { invoiceNumber: null, error: reservation.error };
+  }
 
   try {
+    const [logoDataUrl, signatureFont] = await Promise.all([
+      fetchDataUrl("./logo.png"),
+      loadSignatureFont().catch(() => null)
+    ]);
     const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 17;
-    const tableWidth = pageWidth - margin * 2;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const tableWidth = pageWidth - PAGE_MARGIN * 2;
+    const right = pageWidth - PAGE_MARGIN;
     const client = plain(quote.inputs.clientName);
-    const result = quote.result;
-    const totals = result.totals;
-    const roomSummary = (quote.inputs.roomLines || []).map((line) => {
-      const firstRate = data.hotels.records.find((row) =>
-        row.hotel === quote.inputs.hotel && row.room_type === line.roomType
-      );
-      const board = firstRate?.board_basis || "";
-      return `${line.rooms} x ${line.roomType}${board ? `, ${board}` : ""} (${line.occupancy} per room)`;
-    }).join("; ");
+    const { totals } = quote.result;
+    let hasSignatureFont = false;
+    if (signatureFont) {
+      try {
+        addSignatureFont(doc, signatureFont);
+        hasSignatureFont = true;
+      } catch {
+        hasSignatureFont = false;
+      }
+    }
+
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, "F");
+    doc.addImage(logoDataUrl, "PNG", PAGE_MARGIN, 25, 55, 55);
 
     doc.setTextColor(0, 0, 0);
-    doc.setDrawColor(0, 0, 0);
-    doc.setFont("times", "bold");
-    doc.setFontSize(19);
-    doc.text(textOrPlaceholder(settings, "company_name"), margin, 20);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    const companyDetails = [
-      textOrPlaceholder(settings, "company_address"),
-      `${textOrPlaceholder(settings, "company_email")}  |  ${textOrPlaceholder(settings, "company_phone")}`
-    ];
-    doc.text(companyDetails, margin, 27, { lineHeightFactor: 1.35 });
+    doc.setFontSize(22);
+    doc.text("PRO FORMA INVOICE", right, 29, { align: "right", charSpace: 0.8 });
 
-    const metaX = pageWidth - margin;
-    doc.setFont("times", "bold");
-    doc.setFontSize(20);
-    doc.text("Pro forma invoice", metaX, 48, { align: "right" });
+    const companyName = plain(settings.company_name);
+    const companyLines = settingsLines(settings, [
+      "company_address_line_1",
+      "company_address_line_2",
+      "company_address_line_3"
+    ]);
+    if (!companyLines.length && plain(settings.company_address)) companyLines.push(plain(settings.company_address));
+    doc.setTextColor(128, 128, 128);
+    doc.setFontSize(10);
+    let companyY = 39;
+    if (companyName) {
+      doc.setFont("helvetica", "bold");
+      doc.text(companyName, right, companyY, { align: "right" });
+      companyY += 4.5;
+    }
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    const metadata = [
-      `Invoice no.  ${invoiceNumber}`,
-      `Issue date  ${formatDate(issueDate)}`,
-      `Valid until  ${formatDate(totals.validUntil)}`
-    ];
-    metadata.forEach((line, index) => doc.text(line, metaX, 56 + index * 5, { align: "right" }));
+    if (companyLines.length) {
+      doc.text(companyLines, right, companyY, { align: "right", lineHeightFactor: 1.2 });
+      companyY += companyLines.length * 4.2 + 4.5;
+    }
+    if (plain(settings.company_email)) {
+      doc.text(plain(settings.company_email), right, companyY, { align: "right" });
+    }
 
-    doc.setLineWidth(0.3);
-    doc.line(margin, 73, pageWidth - margin, 73);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("CLIENT", margin, 81);
-    doc.text("TRAVEL DETAILS", margin + tableWidth / 2, 81);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    const clientDetails = [
+    const clientLines = [
       client,
-      quote.inputs.leadTraveller ? `Lead traveller: ${quote.inputs.leadTraveller}` : "",
-      quote.inputs.email || "",
-      quote.inputs.phone || ""
+      plain(quote.inputs.leadTraveller),
+      plain(quote.inputs.email),
+      plain(quote.inputs.phone)
     ].filter(Boolean);
-    const travelDetails = [
-      `${formatDate(quote.inputs.checkIn)} to ${formatDate(quote.inputs.checkOut)} (${result.stay.nights} nights)`,
-      quote.inputs.hotel || "",
-      roomSummary
-    ].filter(Boolean);
-    doc.text(clientDetails, margin, 87, { lineHeightFactor: 1.4 });
-    doc.text(doc.splitTextToSize(travelDetails.join("\n"), tableWidth / 2 - 5), margin + tableWidth / 2, 87, { lineHeightFactor: 1.4 });
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(clientLines, PAGE_MARGIN + 2, 88, { lineHeightFactor: 1.3 });
 
-    const body = result.lines.filter((line) => !line.internalOnly && (line.totalSellGBP !== 0 || line.type !== "discount"))
+    const infoX = PAGE_MARGIN + tableWidth * 0.5;
+    const valueX = right;
+    const infoRows = [
+      { label: "Pro forma invoice No.:", value: invoiceNumber, y: 88 },
+      { label: "Issue date:", value: dateDDMMYYYY(issueDate), y: 93 },
+      { label: "Due date:", value: dateDDMMYYYY(issueDate), y: 98 },
+      { label: "Reference:", value: plain(quote.id), y: 108, size: 7.5 },
+      { label: "Travel dates:", value: `${dateDDMMYYYY(quote.inputs.checkIn)} to ${dateDDMMYYYY(quote.inputs.checkOut)}`, y: 115 }
+    ];
+    infoRows.forEach(({ label, value, y, size = 9.5 }) => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.text(label, infoX, y);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(size);
+      doc.text(value, valueX, y, { align: "right" });
+    });
+
+    const body = quote.result.lines
+      .filter((line) => !line.internalOnly)
       .map((line) => [
-        line.description,
+        datesInText(line.description),
         String(line.quantity),
         formatGBP(line.unitPriceGBP),
         formatGBP(line.totalSellGBP)
       ]);
     doc.autoTable({
-      startY: 111,
-      margin: { left: margin, right: margin },
+      startY: 120,
+      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: 54 },
       tableWidth,
-      head: [["Description", "Qty", "Unit price (GBP)", "Amount (GBP)"]],
+      head: [["DESCRIPTION", "QUANTITY", "UNIT PRICE (£)", "AMOUNT (£)"]],
       body,
       theme: "plain",
       styles: {
         font: "helvetica",
         fontSize: 8,
         textColor: 0,
-        lineColor: 150,
-        lineWidth: 0.15,
-        cellPadding: 2.6,
-        overflow: "linebreak"
+        lineColor: [217, 217, 217],
+        lineWidth: { top: 0, right: 0, bottom: 0.18, left: 0 },
+        cellPadding: { top: 2, right: 3, bottom: 2, left: 3 },
+        overflow: "linebreak",
+        valign: "middle"
       },
-      headStyles: { fontStyle: "bold", fillColor: [235, 235, 235], textColor: 0, lineColor: 0, lineWidth: 0.25 },
+      headStyles: {
+        fontStyle: "bold",
+        fillColor: [197, 202, 206],
+        textColor: 0,
+        lineWidth: 0,
+        cellPadding: { top: 2.5, right: 3, bottom: 2.5, left: 3 }
+      },
       columnStyles: {
-        0: { cellWidth: tableWidth - 77 },
-        1: { cellWidth: 13, halign: "right" },
-        2: { cellWidth: 32, halign: "right" },
-        3: { cellWidth: 32, halign: "right" }
+        0: { cellWidth: 100, halign: "left" },
+        1: { cellWidth: 22, halign: "right" },
+        2: { cellWidth: 30, halign: "right" },
+        3: { cellWidth: 26, halign: "right" }
       },
+      didParseCell: (context) => {
+        if (context.section === "head" && context.column.index > 0) context.cell.styles.halign = "right";
+      }
     });
 
-    let y = doc.lastAutoTable.finalY + 9;
-    const pageHeight = doc.internal.pageSize.getHeight();
-    if (y + 46 > pageHeight - 17) {
+    let totalsY = doc.lastAutoTable.finalY + 8;
+    const paymentTerms = plain(settings.terms_text);
+    const wrappedTerms = paymentTerms ? doc.splitTextToSize(paymentTerms, tableWidth) : [];
+    const bankLines = paymentLines(settings, totals, quote);
+    const wrappedBankLines = bankLines.flatMap((line) => doc.splitTextToSize(line, tableWidth));
+    const paymentTextLines = wrappedBankLines.length + wrappedTerms.length + (paymentTerms ? 1 : 0) + 1;
+    const paymentHeight = 7 + paymentTextLines * 3.6 + 7;
+    const paymentY = pageHeight - PAGE_FOOTER - paymentHeight;
+    const totalX = PAGE_MARGIN + tableWidth * 0.54;
+    if (totalsY + 35 > paymentY - 4) {
       doc.addPage();
-      y = 20;
+      totalsY = 23;
     }
-    const labelX = pageWidth - margin - 83;
-    doc.setLineWidth(0.3);
-    doc.line(labelX, y, pageWidth - margin, y);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("Total (GBP)", labelX, y + 7);
-    doc.setFontSize(12);
-    doc.text(formatGBP(totals.totalSellGBP), pageWidth - margin, y + 7, { align: "right" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(`Deposit (${settings.deposit_percent || 30}%): ${formatGBP(totals.depositGBP)}`, labelX, y + 15);
-    doc.text(`Amount due now: ${formatGBP(totals.amountDueNowGBP)}${totals.dueImmediately ? " (full amount due now)" : ""}`, labelX, y + 21);
-    const balanceDue = totals.dueImmediately
-      ? "Full amount due immediately"
-      : `Balance (${formatGBP(totals.balanceGBP)}) due ${formatDate(totals.balanceDueDate)}`;
-    doc.text(balanceDue, labelX, y + 27);
 
-    y += 37;
-    if (y + 47 > pageHeight - 17) {
-      doc.addPage();
-      y = 20;
-    }
-    doc.line(margin, y, pageWidth - margin, y);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("Payment details", margin, y + 7);
+    doc.setFontSize(9);
+    doc.setTextColor(51, 51, 51);
+    doc.text("TOTAL (GBP):", totalX, totalsY);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    const bankDetails = [
-      `${textOrPlaceholder(settings, "bank_name")} | Account name: ${textOrPlaceholder(settings, "account_name")}`,
-      `Sort code: ${textOrPlaceholder(settings, "sort_code")} | Account no.: ${textOrPlaceholder(settings, "account_number")}`,
-      `IBAN: ${textOrPlaceholder(settings, "iban")} | SWIFT: ${textOrPlaceholder(settings, "swift")}`
+    doc.setTextColor(128, 128, 128);
+    doc.text(formatGBP(totals.totalSellGBP), right, totalsY, { align: "right" });
+    doc.setDrawColor(174, 174, 174);
+    doc.setLineWidth(0.25);
+    doc.line(totalX, totalsY + 5, right, totalsY + 5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(51, 51, 51);
+    doc.setFontSize(16);
+    doc.text("TOTAL DUE (GBP)", totalX, totalsY + 13);
+    doc.text(formatGBP(totals.totalSellGBP), right, totalsY + 13, { align: "right" });
+
+    const signatureY = totalsY + 25;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Issued by, signature:", right, signatureY, { align: "right" });
+    doc.setFont(hasSignatureFont ? "GreatVibes" : "times", hasSignatureFont ? "normal" : "italic");
+    doc.setFontSize(hasSignatureFont ? 22 : 16);
+    doc.text(companyName, right, signatureY + 10, { align: "right" });
+
+    doc.setDrawColor(217, 217, 217);
+    doc.setLineWidth(0.2);
+    doc.line(PAGE_MARGIN, paymentY - 4, right, paymentY - 4);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(112, 112, 112);
+    const paymentText = [
+      ...wrappedBankLines,
+      ...(wrappedTerms.length ? [`Terms: ${wrappedTerms.shift()}`, ...wrappedTerms] : []),
+      "This is a pro forma invoice and not a VAT invoice."
     ];
-    doc.text(bankDetails, margin, y + 13, { lineHeightFactor: 1.4 });
-    const termsStart = y + 30;
-    const terms = doc.splitTextToSize(settings.terms_text || "A 30% deposit confirms your booking. The remaining balance is due before travel.", tableWidth);
-    doc.text(terms, margin, termsStart, { lineHeightFactor: 1.4 });
-    const disclaimerY = termsStart + terms.length * 4 + 5;
-    if (disclaimerY > pageHeight - 13) {
-      doc.addPage();
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.text(settings.terms_text || "", margin, 20, { maxWidth: tableWidth });
-      doc.text("This is a pro forma invoice and not a VAT invoice.", margin, 36);
-    } else {
-      doc.text("This is a pro forma invoice and not a VAT invoice.", margin, disclaimerY);
-    }
+    doc.text(paymentText, PAGE_MARGIN, paymentY, { lineHeightFactor: 1.15 });
 
     const pageCount = doc.internal.getNumberOfPages();
     if (pageCount > 1) {
@@ -180,13 +283,17 @@ export function generateInvoicePdf({ quote, data, settings, jsPDF = globalThis.j
         doc.setPage(page);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
-        doc.setTextColor(80, 80, 80);
-        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 9, { align: "right" });
+        doc.setTextColor(112, 112, 112);
+        doc.text(`Page ${page} of ${pageCount}`, right, pageHeight - 4, { align: "right" });
       }
     }
-    const filename = `${invoiceNumber}_${safeFilename(client)}.pdf`;
-    doc.save(filename);
-    return { invoiceNumber, filename, error: null };
+
+    return {
+      invoiceNumber,
+      filename: `${invoiceNumber}_${safeFilename(client)}.pdf`,
+      blob: doc.output("blob"),
+      error: null
+    };
   } catch (error) {
     return { invoiceNumber, error: `The PDF could not be generated: ${error.message}` };
   }

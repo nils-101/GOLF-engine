@@ -159,6 +159,9 @@ h4 { font-size: 16px; }
 .payment-summary { display: grid; gap: 6px; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--grey-200); color: var(--grey-700); font-size: 9px; }
 .payment-summary span { display: flex; justify-content: space-between; gap: 10px; }
 .payment-summary b { color: var(--ink); font-weight: 600; }
+#download-invoice { width: 100%; margin-top: 14px; }
+#invoice-hint { margin: 7px 0 0; }
+#invoice-hint[hidden] { display: none; }
 .internal-card { border: 1px solid var(--grey-300); }
 .internal-card-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 14px 15px 11px; border-bottom: 1px solid var(--grey-200); }
 .internal-card-head h3 { font-size: 18px; }

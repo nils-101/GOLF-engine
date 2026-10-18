@@ -144,7 +144,7 @@ One row per app or invoice setting. The file uses `key,value`; keep keys exactly
 | Key | Meaning |
 | --- | --- |
 | `company_name` | Supplier name printed on the invoice. |
-| `company_address` | Supplier address. |
+| `company_address_line_1` / `_2` / `_3` | Optional supplier address lines, printed under the company name. |
 | `company_email` | Supplier contact email. |
 | `company_phone` | Supplier contact telephone. |
 | `bank_name` | Name of the payment bank. |

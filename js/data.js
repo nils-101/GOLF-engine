@@ -338,7 +338,7 @@ export function validateData(data) {
 
   const validSettings = new Map(settings.map((row) => [row.key, row.value]));
   for (const setting of [
-    "company_name", "company_address", "company_email", "company_phone",
+    "company_name", "company_address_line_1", "company_email", "company_phone",
     "bank_name", "account_name", "sort_code", "account_number", "iban", "swift",
     "deposit_percent", "balance_due_weeks_before_travel", "quote_valid_days",
     "invoice_prefix", "terms_text"

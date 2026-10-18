@@ -409,6 +409,7 @@ function updateQuote() {
   const valid = result.errors.length === 0;
   $("#save-quote").disabled = !valid;
   $("#download-invoice").disabled = !valid;
+  $("#invoice-hint").hidden = valid;
   $("#quote-error-summary").hidden = valid;
   $("#quote-error-summary").replaceChildren();
   if (!valid) {
@@ -492,9 +493,11 @@ function bindForm() {
     history.replaceState(null, "", `index.html?quote=${encodeURIComponent(state.quoteId)}`);
     showNotice("Quote saved in this browser.", "success");
   });
-  $("#download-invoice").addEventListener("click", () => {
+  $("#download-invoice").addEventListener("click", async () => {
     updateQuote();
     if (!state.lastResult || state.lastResult.errors.length) return;
+    const fallbackTab = window.open("about:blank", "_blank");
+    if (fallbackTab) fallbackTab.document.body.textContent = "Preparing your pro forma invoice…";
     const saved = saveQuote({
       id: state.quoteId,
       inputs: readFormInputs(),
@@ -502,15 +505,20 @@ function bindForm() {
       dataVersion: dataVersion(state.data),
       status: state.quoteStatus
     });
-    if (saved.error) return showNotice(saved.error, "error");
+    if (saved.error) {
+      fallbackTab?.close();
+      return showNotice(saved.error, "error");
+    }
     state.quoteId = saved.quote.id;
-    const pdf = generateInvoicePdf({
+    const pdf = await generateInvoicePdf({
       quote: { ...saved.quote, result: state.lastResult },
-      data: state.data,
       settings: state.settings
     });
-    if (pdf.error) return showNotice(pdf.error, "error");
-    saveQuote({
+    if (pdf.error) {
+      fallbackTab?.close();
+      return showNotice(pdf.error, "error");
+    }
+    const reserved = saveQuote({
       id: saved.quote.id,
       inputs: readFormInputs(),
       result: state.lastResult,
@@ -518,8 +526,40 @@ function bindForm() {
       status: state.quoteStatus,
       invoiceNumber: pdf.invoiceNumber
     });
+    if (reserved.error) {
+      fallbackTab?.close();
+      return showNotice(`The invoice was created, but its number could not be saved with the quote: ${reserved.error}`, "error");
+    }
     history.replaceState(null, "", `index.html?quote=${encodeURIComponent(state.quoteId)}`);
-    showNotice(`Pro forma invoice ${pdf.invoiceNumber} downloaded.`, "success");
+    const objectUrl = URL.createObjectURL(pdf.blob);
+    const link = document.createElement("a");
+    let openedInTab = false;
+    try {
+      if (!("download" in link)) throw new Error("File downloads are not supported in this browser.");
+      link.href = objectUrl;
+      link.download = pdf.filename;
+      link.hidden = true;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      fallbackTab?.close();
+    } catch {
+      link.remove();
+      if (fallbackTab) {
+        fallbackTab.location.href = objectUrl;
+        openedInTab = true;
+      } else {
+        const opened = window.open(objectUrl, "_blank");
+        openedInTab = Boolean(opened);
+      }
+    }
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    showNotice(
+      openedInTab
+        ? `Pro forma invoice ${pdf.invoiceNumber} opened in a new tab.`
+        : `Pro forma invoice ${pdf.invoiceNumber} downloaded.`,
+      "success"
+    );
   });
 }
 
