@@ -170,7 +170,17 @@ export function nextInvoiceNumber(prefix, year) {
     if (!Number.isSafeInteger(sequence) || sequence < 0) {
       return { invoiceNumber: null, error: "The saved invoice sequence is invalid. Do not issue an invoice until it is repaired." };
     }
-    const next = sequence + 1;
+    const saved = loadQuotes();
+    if (saved.error) return { invoiceNumber: null, error: saved.error };
+    const prefixForYear = `${prefix}-${year}-`;
+    const highestSaved = saved.quotes.reduce((highest, quote) => {
+      const number = quote.invoiceNumber;
+      if (typeof number !== "string" || !number.startsWith(prefixForYear)) return highest;
+      const suffix = number.slice(prefixForYear.length);
+      return /^\d+$/.test(suffix) ? Math.max(highest, Number(suffix)) : highest;
+    }, 0);
+    const next = Math.max(sequence, highestSaved) + 1;
+    if (!Number.isSafeInteger(next)) return { invoiceNumber: null, error: "The invoice sequence is too large to continue safely." };
     storage.setItem(key, String(next));
     return { invoiceNumber: `${prefix}-${year}-${String(next).padStart(4, "0")}`, error: null };
   } catch (saveError) {

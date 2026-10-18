@@ -24,6 +24,8 @@ The app reads the CSV files in `data/` on each page load. Each hotel night and g
 
 Prices are parsed into integer minor units. Each complete supplier line is converted to GBP using the matching `fx.csv` rate and rounded half up to a penny. Totals sum those already-rounded lines. Valid offers are shown as separate discount lines. Deposit, balance, quote expiry, and balance due date use the values in `settings.csv`.
 
+The pro forma PDF repeats the on-screen quote lines and GBP amounts, with costs and margins excluded. Company, address, contact, bank, and terms are read from `data/settings.csv`; invoice numbers are sequential per browser and issue year. The root `logo.png` is used as the invoice logo. The embedded Great Vibes signature font is distributed under the Open Font License in `fonts/OFL-Great-Vibes.txt`.
+
 ## Tests
 
 - Node: `npm test`
